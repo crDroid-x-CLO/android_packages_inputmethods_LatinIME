@@ -189,10 +189,22 @@ public final class InputLogic {
         // the useless IPC of {begin,end}BatchEdit.
         if (mWordComposer.isComposingWord()) {
             mConnection.beginBatchEdit();
+
+            final CharSequence textBeforeCursor =
+                    mConnection.getTextBeforeCursor(Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
+            final CharSequence textAfterCursor =
+                    mConnection.getTextAfterCursor(Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
+            final String text = String.valueOf(textBeforeCursor) + String.valueOf(textAfterCursor);
+            final String typedWord = mWordComposer.getTypedWord();
+            if (textBeforeCursor != null && !text.contains(typedWord)) {
+                mWordComposer.reset();
+            }
+
             // If we had a composition in progress, we need to commit the word so that the
             // suggestionsSpan will be added. This will allow resuming on the same suggestions
             // after rotation is finished.
             commitTyped(settingsValues, LastComposedWord.NOT_A_SEPARATOR);
+            mConnection.finishComposingText();
             mConnection.endBatchEdit();
         }
     }
@@ -1426,7 +1438,8 @@ public final class InputLogic {
         // If correction is not enabled, we don't add words to the user history dictionary.
         // That's to avoid unintended additions in some sensitive fields, or fields that
         // expect to receive non-words.
-        if (!settingsValues.mAutoCorrectionEnabledPerUserSettings) return;
+        if (!settingsValues.mAutoCorrectionEnabledPerUserSettings ||
+                !settingsValues.isPersonalizedLearningEnabled()) return;
         if (mConnection.hasSlowInputConnection()) {
             // Since we don't unlearn when the user backspaces on a slow InputConnection,
             // turn off learning to guard against adding typos that the user later deletes.
