@@ -67,12 +67,18 @@ public class SettingsValues {
     public final boolean mSoundOn;
     public final boolean mKeyPreviewPopupOn;
     public final boolean mShowsVoiceInputKey;
+    public final boolean mShowNumberRow;
+    public final boolean mShowNumberRowPassword;
+    public final boolean mShowLongpressHints;
     public final boolean mIncludesOtherImesInLanguageSwitchList;
     public final boolean mShowsLanguageSwitchKey;
+    public final boolean mShowsEmojiKey;
     public final boolean mUseContactsDict;
     public final boolean mUsePersonalizedDicts;
     public final boolean mUseDoubleSpacePeriod;
     public final boolean mBlockPotentiallyOffensive;
+    public final boolean mSpaceTrackpadEnabled;
+    public final boolean mBackspaceTrackpadEnabled;
     // Use bigrams to predict the next word when there is no input for it yet
     public final boolean mBigramPredictionEnabled;
     public final boolean mGestureInputEnabled;
@@ -108,7 +114,6 @@ public class SettingsValues {
     // Debug settings
     public final boolean mIsInternal;
     public final boolean mHasCustomKeyPreviewAnimationParams;
-    public final boolean mHasKeyboardResize;
     public final float mKeyboardHeightScale;
     public final int mKeyPreviewShowUpDuration;
     public final int mKeyPreviewDismissDuration;
@@ -140,11 +145,15 @@ public class SettingsValues {
         mShowsVoiceInputKey = needsToShowVoiceInputKey(prefs, res)
                 && mInputAttributes.mShouldShowVoiceInputKey
                 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN;
+        mShowNumberRow = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, false);
+        mShowNumberRowPassword = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW_PASSWORD, false);
+        mShowLongpressHints = prefs.getBoolean(Settings.PREF_SHOW_LONGPRESS_HINTS, true);
         mIncludesOtherImesInLanguageSwitchList = Settings.ENABLE_SHOW_LANGUAGE_SWITCH_KEY_SETTINGS
                 ? prefs.getBoolean(Settings.PREF_INCLUDE_OTHER_IMES_IN_LANGUAGE_SWITCH_LIST, false)
                 : true /* forcibly */;
         mShowsLanguageSwitchKey = Settings.ENABLE_SHOW_LANGUAGE_SWITCH_KEY_SETTINGS
                 ? Settings.readShowsLanguageSwitchKey(prefs) : true /* forcibly */;
+        mShowsEmojiKey = prefs.getBoolean(Settings.PREF_SHOW_EMOJI_KEY, false);
         mUseContactsDict = prefs.getBoolean(Settings.PREF_KEY_USE_CONTACTS_DICT, true);
         mUsePersonalizedDicts = prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, true);
         mUseDoubleSpacePeriod = prefs.getBoolean(Settings.PREF_KEY_USE_DOUBLE_SPACE_PERIOD, true)
@@ -188,7 +197,6 @@ public class SettingsValues {
         mIsInternal = Settings.isInternal(prefs);
         mHasCustomKeyPreviewAnimationParams = prefs.getBoolean(
                 DebugSettings.PREF_HAS_CUSTOM_KEY_PREVIEW_ANIMATION_PARAMS, false);
-        mHasKeyboardResize = prefs.getBoolean(DebugSettings.PREF_RESIZE_KEYBOARD, false);
         mKeyboardHeightScale = Settings.readKeyboardHeight(prefs, DEFAULT_SIZE_SCALE);
         mKeyPreviewShowUpDuration = Settings.readKeyPreviewAnimationDuration(
                 prefs, DebugSettings.PREF_KEY_PREVIEW_SHOW_UP_DURATION,
@@ -222,6 +230,8 @@ public class SettingsValues {
             new TargetPackageInfoGetterTask(context, mAppWorkarounds)
                     .execute(mInputAttributes.mTargetApplicationPackageName);
         }
+        mSpaceTrackpadEnabled = Settings.readSpaceTrackpadEnabled(prefs);
+        mBackspaceTrackpadEnabled = Settings.readBackspaceTrackpadEnabled(prefs);
     }
 
     public boolean isMetricsLoggingEnabled() {
@@ -299,6 +309,10 @@ public class SettingsValues {
         final AppWorkaroundsUtils appWorkaroundUtils
                 = mAppWorkarounds.get(null, TIMEOUT_TO_GET_TARGET_PACKAGE);
         return null == appWorkaroundUtils ? false : appWorkaroundUtils.isBrokenByRecorrection();
+    }
+
+    public boolean isPersonalizedLearningEnabled() {
+        return !mInputAttributes.mNoPersonalizedLearning;
     }
 
     private static final String SUGGESTIONS_VISIBILITY_HIDE_VALUE_OBSOLETE = "2";

@@ -16,6 +16,8 @@
 
 package com.android.inputmethod.latin;
 
+import static android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+import static android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS;
 import static com.android.inputmethod.latin.common.Constants.ImeOption.FORCE_ASCII;
 import static com.android.inputmethod.latin.common.Constants.ImeOption.NO_MICROPHONE;
 import static com.android.inputmethod.latin.common.Constants.ImeOption.NO_MICROPHONE_COMPAT;
@@ -31,7 +33,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.content.res.Resources;
-import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.inputmethodservice.InputMethodService;
 import android.media.AudioManager;
 import android.os.Build;
@@ -103,6 +106,7 @@ import com.android.inputmethod.latin.utils.ViewLayoutUtils;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
+import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -125,6 +129,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private static final int PENDING_IMS_CALLBACK_DURATION_MILLIS = 800;
     static final long DELAY_WAIT_FOR_DICTIONARY_LOAD_MILLIS = TimeUnit.SECONDS.toMillis(2);
     static final long DELAY_DEALLOCATE_MEMORY_MILLIS = TimeUnit.SECONDS.toMillis(10);
+
+    private static final int MAX_SPACESLIDE_CHARS = 32;
 
     /**
      * A broadcast intent action to hide the software keyboard.
@@ -153,6 +159,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // We expect to have only one decoder in almost all cases, hence the default capacity of 1.
     // If it turns out we need several, it will get grown seamlessly.
     final SparseArray<HardwareEventDecoder> mHardwareEventDecoders = new SparseArray<>(1);
+
+    BreakIterator mBreakWordIterator = BreakIterator.getWordInstance();
 
     // TODO: Move these {@link View}s to {@link KeyboardSwitcher}.
     private View mInputView;
@@ -742,6 +750,19 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     /**
+     * Reset the BreakIterator for the given locale.
+     *
+     * @param locale the locale
+     */
+    private void resetBreakIterator(final Locale locale) {
+        if (locale == null) {
+            mBreakWordIterator = BreakIterator.getWordInstance(Locale.US);
+        } else {
+            mBreakWordIterator = BreakIterator.getWordInstance(locale);
+        }
+    }
+
+    /**
      * Reset suggest by loading the main dictionary of the current locale.
      */
     /* package private */ void resetSuggestMainDict() {
@@ -1095,7 +1116,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public void onWindowShown() {
         super.onWindowShown();
-        setNavigationBarVisibility(isInputViewShown());
+        updateNavigationBarColor();
     }
 
     @Override
@@ -1105,7 +1126,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mainKeyboardView != null) {
             mainKeyboardView.closing();
         }
-        setNavigationBarVisibility(false);
     }
 
     void onFinishInputInternal() {
@@ -1417,6 +1437,82 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return false;
         }
         return false;
+    }
+
+    @Override
+    public void onMovePointer(int steps) {
+        if (steps < 0) {
+            int availableCharacters =
+                getCurrentInputConnection().getTextBeforeCursor(MAX_SPACESLIDE_CHARS, 0).length();
+            steps = availableCharacters < -steps ? -availableCharacters : steps;
+        } else if (steps > 0) {
+            int availableCharacters =
+                getCurrentInputConnection().getTextAfterCursor(MAX_SPACESLIDE_CHARS, 0).length();
+            steps = availableCharacters < steps ? availableCharacters : steps;
+        } else {
+            return;
+        }
+
+        int newPosition = mInputLogic.mConnection.getExpectedSelectionStart() + steps;
+        getCurrentInputConnection().setSelection(newPosition, newPosition);
+    }
+
+    @Override
+    public void onBackspaceSlide(int steps) {
+        int delta = 0;
+        if (steps < 0) {
+            CharSequence text =
+                    getCurrentInputConnection().getTextBeforeCursor(MAX_SPACESLIDE_CHARS, 0);
+            if (text == null || text.length() == 0) {
+                return;
+            }
+            mBreakWordIterator.setText(text.toString());
+            mBreakWordIterator.last();
+            delta = text.length();
+            while (steps < 0) {
+                int start = mBreakWordIterator.previous();
+                if (start == BreakIterator.DONE) {
+                    break;
+                }
+                delta = start;
+                steps++;
+            }
+            delta -= text.length();
+        } else if (steps > 0) {
+            CharSequence text = getCurrentInputConnection().getSelectedText(0);
+            if (text == null || text.length() == 0) {
+                return;
+            }
+            mBreakWordIterator.setText(text.toString());
+            mBreakWordIterator.first();
+            while (steps > 0) {
+                int end = mBreakWordIterator.next();
+                if (end == BreakIterator.DONE) {
+                    break;
+                }
+                delta = end;
+                steps--;
+            }
+        } else {
+            return;
+        }
+
+        // We only extend the start of the selection, never going past the original selection end.
+        int newStart = mInputLogic.mConnection.getExpectedSelectionStart() + delta;
+        int newEnd = mInputLogic.mConnection.getExpectedSelectionEnd();
+        if (newStart > newEnd) {
+            newStart = newEnd;
+        }
+        getCurrentInputConnection().setSelection(newStart, newEnd);
+    }
+
+    @Override
+    public void onBackspaceSlideFinished() {
+        final int start = mInputLogic.mConnection.getExpectedSelectionStart();
+        final int end = mInputLogic.mConnection.getExpectedSelectionEnd();
+        if (start != end) {
+            getCurrentInputConnection().commitText("", 1);
+        }
     }
 
     private boolean isShowingOptionDialog() {
@@ -1869,7 +1965,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                 | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
                 | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        intent.putExtra(SettingsActivity.EXTRA_SHOW_HOME_AS_UP, false);
+        intent.putExtra(SettingsActivity.EXTRA_SHOW_HOME_AS_UP, true);
         intent.putExtra(SettingsActivity.EXTRA_ENTRY_KEY, extraEntryValue);
         startActivityOnTheSameDisplay(intent);
     }
@@ -2022,12 +2118,26 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return mRichImm.shouldOfferSwitchingToNextInputMethod(token, fallbackValue);
     }
 
-    private void setNavigationBarVisibility(final boolean visible) {
-        if (BuildCompatUtils.EFFECTIVE_SDK_INT > Build.VERSION_CODES.M) {
-            // For N and later, IMEs can specify Color.TRANSPARENT to make the navigation bar
-            // transparent.  For other colors the system uses the default color.
-            getWindow().getWindow().setNavigationBarColor(
-                    visible ? Color.BLACK : Color.TRANSPARENT);
+    /** @noinspection deprecation*/
+    private void updateNavigationBarColor() {
+        // This may happen for devices with a physical keyboard
+        if (mInputView == null)
+            return;
+
+        if (BuildCompatUtils.EFFECTIVE_SDK_INT > Build.VERSION_CODES.R) {
+            Drawable bg = mInputView.findViewById(R.id.keyboard_view).getBackground();
+            Window w = getWindow().getWindow();
+            if (bg instanceof ColorDrawable) {
+                w.setNavigationBarColor(((ColorDrawable) bg).getColor());
+            }
+
+            int nightModeFlags = mDisplayContext.getResources().getConfiguration().uiMode &
+                    Configuration.UI_MODE_NIGHT_MASK;
+            int flags = FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS;
+            if (nightModeFlags != Configuration.UI_MODE_NIGHT_YES) {
+                flags |= APPEARANCE_LIGHT_NAVIGATION_BARS;
+            }
+            w.getDecorView().setSystemUiVisibility(flags);
         }
     }
 }

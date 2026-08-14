@@ -85,6 +85,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
 
     // Parameters for pointer handling.
     private static PointerTrackerParams sParams;
+    private static int sPointerStep;
+    private static int sPointerWordStep;
     private static GestureStrokeRecognitionParams sGestureStrokeRecognitionParams;
     private static GestureStrokeDrawingParams sGestureStrokeDrawingParams;
     private static boolean sNeedsPhantomSuddenMoveEventHack;
@@ -128,6 +130,13 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     private int mLastX;
     private int mLastY;
 
+    // For spacebar/backspace slide tracking.
+    private int mStartX;
+    private int mStartY;
+    private long mStartTime;
+    private boolean mSlidOnSpaceBar = false;
+    private boolean mSlidOnBackspace = false;
+
     // true if keyboard layout has been changed.
     private boolean mKeyboardLayoutHasBeenChanged;
 
@@ -156,6 +165,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     public static void init(final TypedArray mainKeyboardViewAttr, final TimerProxy timerProxy,
             final DrawingProxy drawingProxy) {
         sParams = new PointerTrackerParams(mainKeyboardViewAttr);
+        sPointerStep = (int)(10.0 * Resources.getSystem().getDisplayMetrics().density);
+        sPointerWordStep = (int)(20.0 * Resources.getSystem().getDisplayMetrics().density);
         sGestureStrokeRecognitionParams = new GestureStrokeRecognitionParams(mainKeyboardViewAttr);
         sGestureStrokeDrawingParams = new GestureStrokeDrawingParams(mainKeyboardViewAttr);
         sTypingTimeRecorder = new TypingTimeRecorder(
@@ -286,6 +297,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
                     altersCode ? " altersCode" : "", key.isEnabled() ? "" : " disabled"));
         }
         if (ignoreModifierKey) {
+            return;
+        }
+        if (mSlidOnBackspace && code == Constants.CODE_DELETE) {
             return;
         }
         // Even if the key is disabled, it should respond if it is in the altCodeWhileTyping state.
@@ -636,9 +650,14 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         final Key key = getKeyOn(x, y);
         mBogusMoveEventDetector.onActualDownEvent(x, y);
         if (key != null && key.isModifier()) {
-            // Before processing a down event of modifier key, all pointers already being
-            // tracked should be released.
-            sPointerTrackerQueue.releaseAllPointers(eventTime);
+            if (sInGesture) {
+                // Make sure not to interrupt an active gesture
+                return;
+            } else {
+                // Before processing a down event of modifier key, all pointers
+                // already being tracked should be released.
+                sPointerTrackerQueue.releaseAllPointers(eventTime);
+            }
         }
         sPointerTrackerQueue.add(this);
         onDownEventInternal(x, y, eventTime);
@@ -691,6 +710,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             startRepeatKey(key);
             startLongPressTimer(key);
             setPressedKeyGraphics(key, eventTime);
+
+            mStartX = x;
+            mStartY = y;
+            mStartTime = System.currentTimeMillis();
         }
     }
 
@@ -894,6 +917,34 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         final Key oldKey = mCurrentKey;
         final Key newKey = onMoveKey(x, y);
 
+        // Cursor space bar slider
+        if (oldKey != null && oldKey.getCode() == Constants.CODE_SPACE
+                && Settings.getInstance().getCurrent().mSpaceTrackpadEnabled) {
+            int steps = (x - mStartX) / sPointerStep;
+            if (steps != 0
+                    && mStartTime + Settings.getInstance().getCurrent().mKeyLongpressTimeout
+                        < System.currentTimeMillis()) {
+                mSlidOnSpaceBar = true;
+                mStartX += steps * sPointerStep;
+                sListener.onMovePointer(steps);
+            }
+            return;
+        }
+
+        // Backspace slider
+        if (oldKey != null && oldKey.getCode() == Constants.CODE_DELETE
+                && Settings.getInstance().getCurrent().mBackspaceTrackpadEnabled) {
+            int steps = (x - mStartX) / sPointerWordStep;
+            if (steps != 0
+                    && mStartTime + Settings.getInstance().getCurrent().mKeyLongpressTimeout
+                    < System.currentTimeMillis()) {
+                mSlidOnBackspace = true;
+                mStartX += steps * sPointerWordStep;
+                sListener.onBackspaceSlide(steps);
+            }
+            return;
+        }
+
         if (sGestureEnabler.shouldHandleGesture()) {
             // Register move event on gesture tracker.
             onGestureMoveEvent(x, y, eventTime, true /* isMajorEvent */, newKey);
@@ -976,6 +1027,17 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             return;
         }
 
+        if (mSlidOnSpaceBar) {
+            mSlidOnSpaceBar = false;
+            return;
+        }
+
+        if (mSlidOnBackspace) {
+            sListener.onBackspaceSlideFinished();
+            mSlidOnBackspace = false;
+            return;
+        }
+
         if (sInGesture) {
             if (currentKey != null) {
                 callListenerOnRelease(currentKey, currentKey.getCode(), true /* withSliding */);
@@ -1016,6 +1078,12 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     public void onLongPressed() {
         sTimerProxy.cancelLongPressTimersOf(this);
         if (isShowingMoreKeysPanel()) {
+            return;
+        }
+        if (mSlidOnSpaceBar) {
+            return;
+        }
+        if (mSlidOnBackspace) {
             return;
         }
         final Key key = getKey();
@@ -1141,6 +1209,11 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         final int longpressTimeout = Settings.getInstance().getCurrent().mKeyLongpressTimeout;
         if (mIsInSlidingKeyInput) {
             // We use longer timeout for sliding finger input started from the modifier key.
+            return longpressTimeout * MULTIPLIER_FOR_LONG_PRESS_TIMEOUT_IN_SLIDING_INPUT;
+        }
+        if (code == Constants.CODE_SPACE
+                && Settings.getInstance().getCurrent().mSpaceTrackpadEnabled) {
+            // Increase timeout when space bar trackpad is on, to not interfere with language switch
             return longpressTimeout * MULTIPLIER_FOR_LONG_PRESS_TIMEOUT_IN_SLIDING_INPUT;
         }
         return longpressTimeout;

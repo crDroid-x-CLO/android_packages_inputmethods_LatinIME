@@ -56,6 +56,11 @@ public final class PreferencesSettingsFragment extends SubScreenFragment {
         // initialization method of these classes here. See {@link LatinIME#onCreate()}.
         RichInputMethodManager.init(context);
 
+        final boolean showEmojiKeyOption = res.getBoolean(
+                R.bool.config_enable_show_emoji_key_option);
+        if (!showEmojiKeyOption) {
+            removePreference(Settings.PREF_SHOW_EMOJI_KEY);
+        }
         final boolean showVoiceKeyOption = res.getBoolean(
                 R.bool.config_enable_show_voice_key_option);
         if (!showVoiceKeyOption) {
@@ -89,6 +94,10 @@ public final class PreferencesSettingsFragment extends SubScreenFragment {
         if (key.equals(Settings.PREF_POPUP_ON)) {
             setPreferenceEnabled(Settings.PREF_KEY_PREVIEW_POPUP_DISMISS_DELAY,
                     Settings.readKeyPreviewPopupEnabled(prefs, res));
+        }
+        if (key.equals(Settings.PREF_SHOW_NUMBER_ROW)) {
+            setPreferenceEnabled(Settings.PREF_SHOW_NUMBER_ROW_PASSWORD,
+                    !Settings.readShowNumberRow(prefs));
         }
         refreshEnablingsOfKeypressSoundAndVibrationSettings();
     }
