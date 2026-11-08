@@ -20,10 +20,26 @@
     <string name="prefs_keyboard_height_scale">مقیاس اندازه صفحه کلید</string>
     <string name="number_row">ردیف عدد</string>
     <string name="number_row_summary">همیشه برای همه طرح‌بندی‌هایی که دارای 4 ردیف کلید هستند، یک ردیف عددی نشان دهید</string>
+    <string name="number_row_password">ردیف اعداد برای رمزهای عبور</string>
+    <string name="number_row_password_summary">همیشه برای تمام طرح‌بندی‌هایی که دارای ۴ ردیف کلید برای ورود رمز عبور هستند، یک ردیف اعداد نمایش داده شود</string>
     <string name="space_trackpad">صفحه دکمه فاصله</string>
     <string name="space_trackpad_summary">برای جابجایی مکان نما، انگشت خود را روی کلید فاصله بکشید</string>
+    <string name="backspace_trackpad">دکمه پس‌بَر ترک‌پد</string>
+    <string name="backspace_trackpad_summary">برای حذف کلمات، کلید پس‌بَر را بکشید</string>
     <string name="show_longpress_hints">نمایش نکات کلیدی با فشار طولانی</string>
     <string name="show_longpress_hints_summary">نمایش نکات با فشار طولانی برای کلیدهای پشتیبانی شده</string>
     <string name="show_emoji_key">نمایش کلید ایموجی</string>
-    <string name="show_emoji_key_summary">همیشه کلید ایموجی را نشان دهید. وقتی این گزینه فعال باشد، کلید تغییر زبان نمایش داده نمی شود.</string>
+    <string name="show_emoji_key_summary">همیشه کلید ایموجی را نشان دهید.</string>
+    <string name="enable_split_keyboard_summary">فقط در حالت افقی</string>
+    <string name="split_keyboard_duplicate_keys">کلیدهای مرکزی تکراری</string>
+    <string name="split_keyboard_duplicate_keys_summary">کلیدهای نزدیک به وسط را در هر دو نیمه نمایش دهید</string>
+    <string name="spoken_description_split_keyboard">صفحه‌کلید دوتکه</string>
+    <string name="spoken_description_merge_keyboard">ادغام صفحه‌کلید</string>
+    <string name="spoken_description_float_keyboard">صفحه‌کلید شناور</string>
+    <string name="spoken_description_dock_keyboard">صفحه‌کلید اسکله</string>
+    <string name="floating_keyboard_drag_handle">جابه‌جایی صفحه‌کلید</string>
+    <string name="floating_keyboard_resize_handle">تغییر اندازه صفحه‌کلید</string>
+    <string name="floating_keyboard_reset">بازنشانی</string>
+    <string name="floating_keyboard_hide">مخفی‌کردن صفحه‌کلید</string>
+    <string name="floating_keyboard_switch_ime">تغییر روش ورودی</string>
 </resources>

@@ -22,9 +22,9 @@ import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.res.Resources;
 import android.os.Bundle;
-import android.preference.ListPreference;
-import android.preference.Preference;
-import android.preference.PreferenceScreen;
+import androidx.preference.ListPreference;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceScreen;
 import android.util.Log;
 
 /**
@@ -87,13 +87,6 @@ public abstract class SubScreenFragment extends CustomPreferenceFragment
         final Resources res = getResources();
         final int applicationLabelRes = context.getApplicationInfo().labelRes;
         return res.getString(applicationLabelRes);
-    }
-
-    @Override
-    public void addPreferencesFromResource(final int preferencesResId) {
-        super.addPreferencesFromResource(preferencesResId);
-        TwoStatePreferenceHelper.replaceCheckBoxPreferencesBySwitchPreferences(
-                getPreferenceScreen());
     }
 
     @Override

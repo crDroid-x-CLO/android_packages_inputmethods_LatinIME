@@ -42,7 +42,7 @@ public final class KeyboardTheme implements Comparable<KeyboardTheme> {
     public static final int THEME_ID_AUTO_DARK = 5;
     public static final int THEME_ID_YOU = 6;
     public static final int THEME_ID_OLED = 7;
-    public static final int DEFAULT_THEME_ID = THEME_ID_AUTO_DARK;
+    public static final int DEFAULT_THEME_ID = THEME_ID_YOU;
 
     private static KeyboardTheme[] AVAILABLE_KEYBOARD_THEMES;
 
@@ -129,7 +129,7 @@ public final class KeyboardTheme implements Comparable<KeyboardTheme> {
         if (theme == null) {
             theme = searchKeyboardThemeById(DEFAULT_THEME_ID, KEYBOARD_THEMES);
         }
-        return theme.mThemeName;
+        return theme != null ? theme.mThemeName : null;
     }
 
     public static void saveKeyboardThemeId(final int themeId, final SharedPreferences prefs) {
